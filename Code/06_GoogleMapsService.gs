@@ -256,7 +256,10 @@ function mapsAutoSweep_(sheet, headerRow, idxDist, idxAddr, idxLL_Main, excludeR
       const valAddr = idxAddr > 0 ? rowVal[idxAddr - 1] : 'OK';
       const valLL = idxLL_Main > 0 ? rowVal[idxLL_Main - 1] : '';
 
-      if ((valDist === '' || valAddr === '' || valDist === 'N/A') &&
+      // [v5.5.7 AUDIT FIX-1] เพิ่ม valAddr === 'N/A' ใน gate — เดิมเช็คเฉพาะ valDist 'N/A'
+      //   ทำให้แถวที่ addr='N/A' แต่ dist มีค่า ไม่ถูก sweep ทั้งที่ inner logic รองรับการแก้ addr N/A อยู่แล้ว
+      //   หลักฐาน: SOURCE จริงมี 3 แถว addr='N/A' + dist ถูกต้อง ค้างไม่ถูกแก้
+      if ((valDist === '' || valDist === 'N/A' || valAddr === '' || valAddr === 'N/A') &&
           valLL && valLL.toString().includes(',')) {
         console.log('🧹 Maps Auto-Sweep fixing Row ' + currentRowNum + '...');
         const llStr = valLL.toString();
@@ -312,7 +315,8 @@ function mapsRetryMissingData() {
       const addrVal = row[idxAddr - 1];
       const latLngStr = row[idxLL - 1];
 
-      if ((distVal === '' || addrVal === '' || distVal === 'N/A') &&
+      // [v5.5.7 AUDIT FIX-1] เพิ่ม addrVal === 'N/A' ใน gate ให้ตรงกับ inner logic (เดิมพลาดเฉพาะฝั่ง addr)
+      if ((distVal === '' || distVal === 'N/A' || addrVal === '' || addrVal === 'N/A') &&
           latLngStr && String(latLngStr).includes(',')) {
         const parts = String(latLngStr).split(',').map(function (s) { return parseFloat(s.trim()); });
         const lat = parts[0];
