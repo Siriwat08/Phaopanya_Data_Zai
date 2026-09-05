@@ -2,6 +2,14 @@
  * 06_GoogleMapsService.gs — Google Maps helpers for AppSheet Bot "Seeker"
  * Base: รหัส_v3.6.js (Amit Agarwal + patches v3.1–v3.6)
  *
+ * [v5.5.7 + SEC 05/09/2026 — ถอด SPREADSHEET_ID]
+ *   ฉบับนี้ = โค้ด v5.5.7 (มี AUDIT FIX-1: sweep รองรับ addr='N/A') และถอด ID ชีตจริงออก
+ *   เหตุผล: SPREADSHEET_ID เดิมถูก hard-code บน repo สาธารณะ (ความเสี่ยง exposure)
+ *   ผล: ปล่อย '' → mapsGetSheet_() ใช้ Active Spreadsheet ของโปรเจกต์ที่สคริปต์ผูกอยู่ (container-bound)
+ *   ข้อแม้จีเจียว: สคริปต์ต้องอยู่ในโปรเจกต์ Apps Script ที่ผูกกับชีตงานจริงเท่านั้น
+ *   (ยังไม่ต้องแก้อะไรเพิ่ม — ถ้าเคยเปิดชีตจาก standalone ให้กลับมาใส่ ID ที่บรรทัด SPREADSHEET_ID นี้
+ *    หลังผลักโค้ดขึ้น GitHub เสร็จ)
+ *
  * [COMPAT v3.7 — for Phaopanya Master v5.5.3 same project]
  *   ✅ ไม่ใช้ชื่อ onOpen / CONFIG / getCache / getSheet ฯลฯ ที่อาจชนกับ Master
  *   ✅ เมนู: เรียก mapsInstallMenu_() จาก onOpen ของ 03_Menu.gs
@@ -24,8 +32,9 @@
 // =================================================================
 
 const MAPS_CONFIG = {
-  // ถ้าสคริปต์ผูกกับชีตงานอยู่แล้ว ปล่อย SPREADSHEET_ID = '' จะใช้ Active spreadsheet
-  SPREADSHEET_ID: '1CYtLpXn6gNYgbGu3oRF8CW5KkGYHQJ6D4jl9u2LiR6o',
+  // [v5.5.7 + SEC 05/09/2026] ถอด ID ออก — ปล่อย '' จะใช้ Active spreadsheet ของโปรเจกต์ที่สคริปต์ผูกอยู่
+  // (เดิม: ใส่ ID ชีตจริง hard-code อยู่บรรทัดนี้บน repo สาธารณะ — หากต้องการใช้แบบ standalone ค่อยใส่กลับที่นี่)
+  SPREADSHEET_ID: '',
   SHEET_NAME: 'SCGนครหลวงJWDภูมิภาค',
   DEPOT_COORDS: '14.164671,100.625358',
   COL_DISTANCE: 'ระยะทางจากคลัง_Km',
