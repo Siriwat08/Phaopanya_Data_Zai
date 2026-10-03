@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * Phaopanya MASTER Cleanup Suite — Task 45 · rev.2 (Task 47-48)
+ * Phaopanya MASTER Cleanup Suite — Task 45 · rev.2.2 (Task 47-48) · ★ r2.3 (Task 64)
  * ไฟล์: 54_CleanupPhase2.gs — เฟส 2: kNN ตัดสิน O≠W + ชุดแก้คอลัมน์ราชการ
  * พอร์ตจาก cleanup_2_md0003_corrections.py
  * ============================================================================
@@ -13,12 +13,27 @@
  * ★ rev.2 — รับข้อตรวจ Grok 3 ฉบับ (กัน "auto ทั้งก้อน"):
  *   แถวจะถูกเขียนอัตโนมัติ "ต่อเมื่อผ่านธงทั้งหมด" — ติดธง = คิวตรวจมือ:
  *   1) KNN_THIN   : เสียงโหวต O ต่ำกว่า MIN_KNN_DOMINANCE (10/15)
- *                   — โหวตบาง เชื่อไม่พอ ให้คนดู (เปิด MAPS_URL เทียบ)
  *   2) KNN_FAR    : มัธยฐานระยะเพื่อนบ้านเกิน MAX_MED_M (3 กม.)
- *                   — พินโดดเดี่ยว เพื่อนบ้านอาจไม่ใช่พื้นที่เดียวกัน
  *   3) NV_CONFLICT: แถวนั้น N≠V (จังหวัดขัด) และโหวตจังหวัด "ไม่ได้ชี้ขาดข้าง N"
- *                   — เขียน V=N ไปพร้อมกันจะเสี่ยงแก้ผิดสองชั้น ให้ตรวจมือ
  *      (ธงเดิม X_KEEP_REVIEW / U_KEEP_REVIEW / V_KEEP_OLD_N_EMPTY ยังอยู่ครบ)
+ *
+ * ★★ r2.3 (Task 64 · 2026-10-03) — แก้ 3 จุดจากการตรวจโครงสร้างรายบรรทัด:
+ *   FIX-1 บั๊กหน่วย KNN_FAR (ร้ายแรง): เดิมเทียบ v.med (หน่วย กม. จาก haversine
+ *        R=6371) กับ MAX_MED_M=3000 (หน่วย เมตร) → 12.4 กม. ก็ยัง "ไม่เกิน 3000"
+ *        → ธงระยะทางไม่เคยติดเลยแม้แถวเดียว (ตรวจยืนยันจากผลจริง: 7 แถวระยะเกิน
+ *        3 กม. ไม่มีแถวไหนติดธง) — แก้เป็น v.med > MAX_MED_M/1000 และแสดงหน่วย km
+ *        ในข้อความธงให้ชัดเจน
+ *   FIX-2 หน่วยใน EVIDENCE ของ audit: เดิม 'med=' + opE.med + 'm' ได้ "med=0.2m"
+ *        (ผิด — จริงคือ 0.2 กม.) แก้เป็นแปลงเป็นเมตรจริง Math.round(med*1000)+'m'
+ *        ให้ตรงตัวอย่าง "med=210m" ใน README
+ *   FIX-3 นโยบาย "จังหวัด = คิวมือเท่านั้น" (ตามสเปก SPEC-P2): เพิ่มธง
+ *        V_MANUAL_QUEUE ทุกแถวที่ V จะเปลี่ยน (N≠V) — เหตุผล: (ก) เกณฑ์โหวตจังหวัด
+ *        รอบเดิมอนุญาต auto ด้วยเสียงเพียง ≥3/15 ซึ่งอ่อนกว่ามาตรฐาน 10/15
+ *        ที่เครื่องมือใช้กับอำเภอเอง (ข) ปิดคิว auto เหลือแถวที่ V คงเดิมเท่านั้น
+ *        ตรง Go/No-Go ฉบับนำร่อง (กลุ่ม P ไม่ต้องแลกด้วยความเสี่ยงอีกต่อไป)
+ *        — ถ้าต้องการพฤติกรรมเดิม (อนุญาต auto V=N เมื่อโหวตยืนยัน) ลบบล็อก
+ *        FIX-3 ที่ทำเครื่องหมาย ★ r2.3 ออกได้
+ *   (และ) เปลี่ยนหัวคอลัมน์รายงาน KNN_MED_M → KNN_MED_KM ให้ตรงหน่วยจริง
  *
  * ★ rev.2 — โหมดนำร่อง (pilot): เมนู "นำร่อง N แถว" เขียนเฉพาะ N แถวแรกที่ผ่านธง
  *   (แถวแรกคือ MD-0003) ให้ผู้ใช้เปิด MAPS_URL เทียบ Google Maps ก่อน
@@ -28,7 +43,8 @@
  *
  * สูตรแก้กลุ่ม 106 (ข้อเท็จจริง: V/W/X เป็นไทยทั้งชีต 11,961/11,961 —
  *   EN อยู่เฉพาะ Y กับ suffix _EN ของ GEO_LAYER):
- *   V_new = N (จังหวัดไทยตรง ๆ / เผื่อด้วย V เดิมเมื่อ N ว่าง)
+ *   V_new = N (จังหวัดไทยตรง ๆ / เผื่อด้วย V เดิมเมื่อ N ว่าง)  ← r2.3: แถวที่ V
+ *          เปลี่ยนเพราะสูตรนี้ จะติดธง V_MANUAL_QUEUE ทั้งแถว (ไม่ auto)
  *   W_new = O หลังตัดคำนำหน้า (เขต/อำเภอ/...)
  *   X_new = เสียงข้างมากของ Tambon_Kwaeng จากเพื่อนบ้านที่อำเภอตรงกับ O
  *   U_new = โหวตเพื่อนบ้าน → เผื่อด้วยพจนานุกรม SYS_TH_GEO (อำเภอ,ตำบล)
@@ -39,8 +55,8 @@
  *   หลังทำจริงรอบแรก pool ผู้โหวตสะอาดขึ้น (W เพื่อนบ้านถูกแก้แล้ว)
  *   → รัน "ตรวจอย่างเดียว" ซ้ำ อาจตามเจอแถวที่เดิมถูกเพื่อนบ้านผิดฉุดไว้
  *   (ทดสอบจริง: +4 แถวรอบ 2 → +1 แถวรอบ 3 = รวม 111 แถว)
- *   ★ rev.2 รอบลู่เข้า: แถวที่เคยติดธง KNN_THIN อาจคลายเป็นผ่านธงในรอบหลัง
- *   จบเฟสเมื่อ "แถวที่ผ่านธง = 0" — ที่เหลือติดธงค้าง = คิวตรวจมือถาวร
+ *   ★ r2.3 หมายเหตุ: แถวติดธง V_MANUAL_QUEUE จะไม่ละลายเองในรอบซ้ำ (โดยจุดออกแบบ
+ *   ให้เป็นคิวมือถาวร) — ธง KNN_THIN เท่านั้นที่อาจคลายเป็นผ่านธงในรอบหลัง
  *
  * ★ rev.2.2 (Task 56): ทำจริงห่อด้วย audit — หลักฐานรายแถว (O-votes/med/
  *   X-votes/U-votes) แนบไปกับทุก field ที่เขียน (U/V/W/X/AA) ลง CLEANUP_AUDIT
@@ -95,9 +111,9 @@ function cleanupPhase2(apply, pilotCount) {
     vInfo[i] = v;
   }
 
-  // ---- 2) กลุ่มแก้คอลัมน์ราชการ (106) + ธง rev.2 ----
+  // ---- 2) กลุ่มแก้คอลัมน์ราชการ (106) + ธง rev.2 + ★ r2.3 ----
   var fixRows = [], fixIdx = [];
-  var flagCount = { KNN_THIN: 0, KNN_FAR: 0, NV_CONFLICT: 0,
+  var flagCount = { KNN_THIN: 0, KNN_FAR: 0, NV_CONFLICT: 0, V_MANUAL_QUEUE: 0,
     X_KEEP_REVIEW: 0, U_KEEP_REVIEW: 0, V_KEEP_OLD_N_EMPTY: 0 };
   for (var j = 0; j < owIdx.length; j++) {
     var i = owIdx[j];
@@ -141,12 +157,20 @@ function cleanupPhase2(apply, pilotCount) {
     if (v.vo < CLEANUP_CFG.MIN_KNN_DOMINANCE) {
       flags.push('KNN_THIN(' + v.vo + '/' + K + ')'); flagCount.KNN_THIN++;
     }
-    if (v.med > CLEANUP_CFG.MAX_MED_M) {
-      flags.push('KNN_FAR(' + v.med + 'm)'); flagCount.KNN_FAR++;
+    // ★ r2.3 FIX-1: v.med หน่วย กม. (haversine R=6371) — แปลงเกณฑ์เมตร→กม.ก่อนเทียบ
+    //   เดิม (บั๊ก): if (v.med > CLEANUP_CFG.MAX_MED_M) — 3000 ถูกตีเป็น "กม." ทำให้
+    //   ธงนี้ไม่มีวันติด (ต้องระยะเกิน 3,000 กม.) — ผลจริง: 7 แถวระยะ 3.4–12.4 กม. ไม่มีธงเลย
+    if (v.med > CLEANUP_CFG.MAX_MED_M / 1000) {
+      flags.push('KNN_FAR(' + v.med + 'km)'); flagCount.KNN_FAR++;
     }
     if (N_ !== '' && V_ !== '' && N_ !== V_ &&
         nvVerdict[i] !== 'TH-side right (N matches pin)') {
       flags.push('NV_CONFLICT(' + nvVerdict[i] + ')'); flagCount.NV_CONFLICT++;
+    }
+    // ★ r2.3 FIX-3: จังหวัดจะเปลี่ยน (N≠V) = คิวมือเสมอ — ทั้งแถว ไม่เขียนอัตโนมัติ
+    //   ตามสเปก SPEC-P2 "V ห้าม auto" + ปิดช่องที่เกณฑ์โหวตจังหวัดรอบเดิมอ่อนเกินไป (≥3/15)
+    if (vNew !== V_) {
+      flags.push('V_MANUAL_QUEUE(' + V_ + '→' + vNew + ')'); flagCount.V_MANUAL_QUEUE++;
     }
 
     fixRows.push([i + 2, clStr_(row[c.MD_ID]),
@@ -160,11 +184,12 @@ function cleanupPhase2(apply, pilotCount) {
       v: vNew, w: wNew, x: xNew, u: uNew,
       vo: v.vo, med: v.med, xN: xVotesN, uN: uVotesN }); // rev.2.2: ใช้ทำ evidence รายแถว
   }
+  // ★ r2.3: หัวคอลัมน์ KNN_MED_M → KNN_MED_KM (ค่าเป็นกิโลเมตรจริง — ชื่อเดิมหลอกหน่วย)
   cleanupReportTab_('P2_FIX', ['ROW', 'MD_ID', 'LAT', 'LNG', 'MAPS_URL',
     'N_TH(now)', 'O_TH(now)',
     'U_OLD', 'V_OLD', 'W_OLD', 'X_OLD', 'GEO_LAYER_OLD',
     'V_NEW', 'W_NEW', 'X_NEW', 'U_NEW', 'GEO_LAYER_NEW',
-    'X_VOTES', 'U_VOTES', 'KNN_VOTES_O', 'KNN_MED_M', 'FLAGS'], fixRows);
+    'X_VOTES', 'U_VOTES', 'KNN_VOTES_O', 'KNN_MED_KM', 'FLAGS'], fixRows);
 
   // ---- 3) กลุ่มแก้ฝั่งเอกสาร (269) ----
   var docRows = [];
@@ -258,8 +283,9 @@ function cleanupPhase2(apply, pilotCount) {
           if (opE.flags !== '') continue; // ติดธง = ไม่เขียน = ไม่มี audit
           clAuditSetRowEvidence_(opE.i, {
             reason: 'KNN',
+            // ★ r2.3 FIX-2: opE.med เป็น กม. — แปลงเป็นเมตรจริงให้ตรง README ("med=210m")
             evidence: 'k=' + K + ' O-votes=' + opE.vo + '/' + K +
-              ', med=' + opE.med + 'm, X-votes=' + opE.xN + ', U-votes=' + opE.uN,
+              ', med=' + Math.round(opE.med * 1000) + 'm, X-votes=' + opE.xN + ', U-votes=' + opE.uN,
             confidence: (opE.vo >= K - 2) ? 'HIGH' : 'MEDIUM',
             action: pilotCount > 0 ? 'PILOT_FIX' : 'AUTO_FIX'
           });
@@ -347,6 +373,8 @@ function uiCleanupPhase2Pilot() {
       if (!cleanupConfirm_('เฟส 2 — นำร่อง ' + n + ' แถว',
         'เขียน U/V/W/X + GEO_LAYER=KNN_FIX ให้ "เฉพาะ ' + n + ' แถวแรกที่ผ่านธง"\n' +
         '(แถวแรกคือ MD-0003 — ตรวจแท็บ P2_FIX คอลัมน์ MAPS_URL)\n\n' +
+        '★ r2.3: แถวที่จังหวัด (V) จะเปลี่ยน ติดธง V_MANUAL_QUEUE ทั้งหมด\n' +
+        '   → นำร่อง/ทำจริงจะได้เฉพาะแถวที่ V คงเดิมเท่านั้น\n\n' +
         'หลังรันเสร็จ: เปิด MAPS_URL เทียบ Google Maps ทุกแถว\n' +
         'ถ้าถูกหมด → กลับมากด "ทำจริง" เต็มชุด\n' +
         'ถ้าผิดแม้แต่แถวเดียว → หยุด แล้วส่งแท็บ P2_FIX มาให้ตรวจก่อน\n\n' +
@@ -366,7 +394,9 @@ function uiCleanupPhase2Apply() {
       if (!cleanupConfirm_('เฟส 2 — ทำจริง (เต็มชุด)',
         'เขียน U/V/W/X + GEO_LAYER=KNN_FIX ของแถว "คอลัมน์ราชการผิด" (สไตล์ MD-0003)\n' +
         '★ rev.2: เฉพาะแถวที่ผ่านธงทั้งหมด — ติดธง (KNN_THIN/KNN_FAR/NV_CONFLICT\n' +
-        '   และธงโหวตเดิม) จะถูกข้ามไปเป็นคิวตรวจมือ ไม่เขียนอัตโนมัติ\n\n' +
+        '   และธงโหวตเดิม) จะถูกข้ามไปเป็นคิวตรวจมือ ไม่เขียนอัตโนมัติ\n' +
+        '★ r2.3: ธงเพิ่ม V_MANUAL_QUEUE — แถวที่จังหวัดจะเปลี่ยน = คิวมือถาวร\n' +
+        '   และ KNN_FAR แก้หน่วยแล้ว (เกณฑ์ 3 กม. ใช้งานจริง)\n\n' +
         'แนะนำ: รัน "นำร่อง 10 แถว" + เทียบ MAPS_URL ให้ผ่านก่อนกดตรงนี้\n' +
         'Y และ UPDATED_AT ไม่ถูกแตะ · แนะนำสำรอง (เฟส 0) ก่อน\n\nยืนยัน?')) {
         return 'ยกเลิก';
