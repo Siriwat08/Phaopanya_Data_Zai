@@ -1,4 +1,4 @@
-// ▶ ชุดเต็ม v5.5.7+cleanup-r2.3 (03-10-2026) · ไฟล์ที่ 3/22 · ต้นฉบับ v5.5.7 เปล่า
+// ▶ ชุดเต็ม v5.5.7+cleanup-r2.3 (07-10-2026 · Task72-FIX) · ไฟล์ที่ 3/22 · ต้นฉบับ v5.5.7 เปล่า
 
 /**
  * MasterService — สะสมฐาน MASTER_PLACE จากชีต SCGนครหลวงJWDภูมิภาค
@@ -7,6 +7,13 @@
  *
  * v5.3.1+ : ใช้ SHEETS.* และ MASTER_COLS_LEGACY จาก 00_Config.gs
  *           เพื่อ centralize config (ลบ hard-coded)
+ *
+ * [Task72 FIX 07-10-2026] พิกัดที่สะสมลง MASTER_PLACE อ่านจากคอลัมน์
+ *   'จุดส่งสินค้าปลายทาง' (พินปลายทางจากฟอร์มคนขับ AppSheet — ฉบับล่าสุด
+ *   รวมพินที่ถูกขยับแก้ไขภายหลัง) เป็นหลัก ถ้าว่าง/แยกไม่ได้ค่อย fallback
+ *   ไปคอลัมน์ LAT/LONG แบบเดิม — เดิมอ่าน LAT/LONG อย่างเดียว ซึ่งเป็นค่า
+ *   ตอนส่งฟอร์มครั้งแรก (ตรวจข้อมูลจริง 24,353 แถว: ตรงกัน 23,913 = 98.2%
+ *   เหลือ 440 แถว = 1.8% ที่ LAT/LONG ค้างค่าเก่าไม่ตามพินที่ขยับแล้ว)
  */
 
 // Alias สำหรับ backward compat — ชี้ไปที่ SHEETS.* ใน 00_Config.gs
@@ -27,7 +34,7 @@ function getDriverRows_() {
   const values = sh.getRange(1, 1, lastRow, lastCol).getValues();
   const headers = values[0].map(function (v) { return String(v || '').trim(); });
   const cols = headerMap_(headers);
-  ['ชื่อปลายทาง', 'ที่อยู่ปลายทาง', 'ชื่อเจ้าของสินค้า', 'LAT', 'LONG']
+  ['ชื่อปลายทาง', 'ที่อยู่ปลายทาง', 'ชื่อเจ้าของสินค้า', 'จุดส่งสินค้าปลายทาง', 'LAT', 'LONG']
     .concat(RAW_HELPER_HEADERS)
     .forEach(function (h) { requireHeader_(cols, h, DR_SHEET); });
 
@@ -184,8 +191,21 @@ function runMaster(maxRows, maxMs) {
     // ใช้คีย์ครบ 3 คอลัมน์เท่านั้น ห้ามนำชื่อ+เจ้าของไปผูกกับที่อยู่คนละแห่ง
     let hit = exact || alias;
     let matchStatus = 'KNOWN';
-    const lat = parseNum_(row[cols['LAT']]);
-    const lng = parseNum_(row[cols['LONG']]);
+    // [Task72 FIX 07-10-2026] พิกัดเข้า MASTER เอาจากคอลัมน์ 'จุดส่งสินค้าปลายทาง' เป็นหลัก
+    //   (พินปลายทางจากฟอร์มคนขับ AppSheet = ฉบับล่าสุด รวมพินที่ขยับภายหลัง)
+    //   กติกา: แยก "lat, lng" จากคอลัมน์นี้ได้ → ใช้ค่านี้ · ว่าง/แยกไม่ได้ → ใช้ LAT/LONG เดิม
+    let lat = null;
+    let lng = null;
+    const destLL = String(row[cols['จุดส่งสินค้าปลายทาง']] || '').trim();
+    const mLL = destLL.match(/^([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)$/);
+    if (mLL) {
+      lat = parseFloat(mLL[1]);
+      lng = parseFloat(mLL[2]);
+    }
+    if (lat === null || lng === null) {
+      lat = parseNum_(row[cols['LAT']]);
+      lng = parseNum_(row[cols['LONG']]);
+    }
 
     // เทียบ "ที่อยู่ปลายทาง" กับ SYS_TH_GEO เพื่อเอาคำที่ถูกต้องมาใส่ 4 คอลัมน์:
     //   N (PROVINCE), O (AMPHOE) - ข้อมูลราชการ

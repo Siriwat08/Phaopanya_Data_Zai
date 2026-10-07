@@ -54,7 +54,7 @@ rev.2.3 เกิดจากอะไร
   กลุ่ม 1 · production v5.5.7 — แทนที่เนื้อในไฟล์เดิม (10 ไฟล์)
     00_Config.gs               ★แพตช์ SCRIPT_VERSION ใส่แล้ว (r2.3)
     00_CleanService.gs         ต้นฉบับ v5.5.7 (แพตช์ cleanThai ยังไม่ใส่)
-    01_MasterService.gs        ต้นฉบับ v5.5.7
+    01_MasterService.gs        ต้นฉบับ v5.5.7 + FIX Task72 (07-10: พิกัดปุ่ม 1 จากคอลัมน์ จุดส่งสินค้าปลายทาง)
     02_WorkloadService.gs      ต้นฉบับ v5.5.7
     03_Menu.gs                 ★onOpen มี addCleanupMenu_() แล้ว
     04_GeoService.gs           ★FIX-A แก้ 1-hit dedup ฝั่ง EN ใส่แล้ว
